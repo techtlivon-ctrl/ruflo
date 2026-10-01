@@ -1,0 +1,13 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/healthcheck",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "OPENAI_API_KEY",
+      "description": "OpenAI API key for the chat UI's AI model access. Optional for dev — a placeholder is used if not provided, but AI chat features won't work without a real key. Get it from https://platform.openai.com/api-keys.",
+      "requiredAtBoot": false,
+      "generatedForDevelopment": false
+    }
+  ]
+}

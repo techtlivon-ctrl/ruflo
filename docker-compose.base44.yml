@@ -1,0 +1,78 @@
+# Base44 dev environment for Ruflo Chat UI (ruvocal) + MCP Bridge
+# The SvelteKit chat UI uses a self-contained RVF JSON file store — no MongoDB needed.
+services:
+  # --- MCP Bridge (Express — AI tool routing, multi-provider chat proxy) ---
+  mcp-bridge:
+    image: node:24-slim
+    working_dir: /app
+    volumes:
+      - ./ruflo/src/mcp-bridge:/app
+    restart: on-failure
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - PORT=3001
+      - MCP_BIND_HOST=0.0.0.0
+      - MCP_CORS_ORIGIN=*
+      - NODE_ENV=development
+      # Tool groups (default-on)
+      - MCP_GROUP_INTELLIGENCE=true
+      - MCP_GROUP_AGENTS=true
+      - MCP_GROUP_MEMORY=true
+      - MCP_GROUP_DEVTOOLS=true
+      # Opt-in groups (off for dev)
+      - MCP_GROUP_SECURITY=false
+      - MCP_GROUP_BROWSER=false
+      - MCP_GROUP_NEURAL=false
+      - MCP_GROUP_AGENTIC_FLOW=false
+      - MCP_GROUP_CLAUDE_CODE=false
+      - MCP_GROUP_GEMINI=false
+      - MCP_GROUP_CODEX=false
+    command: ["sh", "-ec", "npm install --omit=dev && exec node --watch index.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # --- RuFlo Chat UI (SvelteKit dev server with live reload) ---
+  chat-ui:
+    image: node:24-slim
+    working_dir: /app
+    volumes:
+      - ./ruflo/src/ruvocal:/app
+    ports:
+      - "3000:3000"
+    restart: on-failure
+    depends_on:
+      mcp-bridge:
+        condition: service_healthy
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      # Branding
+      - PUBLIC_APP_NAME=RuFlo
+      - PUBLIC_APP_DESCRIPTION=Enterprise AI Agent Orchestration Platform
+      - PUBLIC_APP_ASSETS=chatui
+      # Allow embedding in the Base44 preview iframe
+      - ALLOW_IFRAME=true
+      # AI provider config — MCP bridge acts as OpenAI-compatible proxy
+      - OPENAI_BASE_URL=http://mcp-bridge:3001
+      - MCP_SERVERS=[]
+      # Cookie config for dev (HTTP, same-site)
+      - COOKIE_SECURE=false
+      - COOKIE_SAMESITE=lax
+      # Vite dev server: allow the preview's external hostname
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    command: ["sh", "-ec", "npm install && exec npx vite dev --host 0.0.0.0 --port 3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthcheck').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s

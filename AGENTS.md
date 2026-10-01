@@ -705,3 +705,35 @@ enabled = true
 - Issues: https://github.com/ruvnet/claude-flow/issues
 
 **Remember: Codex executes, claude-flow orchestrates!**
+
+---
+
+## Base44 Dev Environment
+
+The app runs via `docker compose -f docker-compose.base44.yml up -d` (port 3000).
+
+### Architecture
+- **chat-ui** (`ruflo/src/ruvocal/`): SvelteKit dev server (Vite, live reload) on port 3000.
+- **mcp-bridge** (`ruflo/src/mcp-bridge/`): Express server on port 3001, proxies AI tool calls.
+- **No MongoDB needed**: The chat UI uses a self-contained RVF JSON file store
+  (`ruflo/src/ruvocal/src/lib/server/database.ts`), despite `ruflo/docker-compose.yml`
+  referencing MongoDB (leftover from the upstream HuggingChat fork).
+
+### Key quirks
+- The MCP bridge refuses to bind 0.0.0.0 without `MCP_AUTH_TOKEN`. Both services
+  share the token via `.env.base44-defaults` (dev placeholder) so the chat UI's
+  `OPENAI_API_KEY` (used as Bearer token) matches the bridge's `MCP_AUTH_TOKEN`.
+- `ALLOW_IFRAME=true` is required for the preview iframe.
+- `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` (bare env, platform-set) allows the
+  preview's external hostname in Vite ≥ 6.1.
+- First boot takes ~60–90s (npm install + Vite compilation).
+
+### Verify it works
+```bash
+docker compose -f docker-compose.base44.yml ps          # both healthy
+curl -s -o /dev/null -w "%{http_code}" localhost:3000/   # 200
+```
+
+### Optional secrets
+- `OPENAI_API_KEY`: real OpenAI key for AI chat features. Without it the UI
+  renders but AI chat won't work. Set via the Base44 secrets dashboard.
